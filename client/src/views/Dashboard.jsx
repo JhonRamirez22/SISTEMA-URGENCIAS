@@ -110,6 +110,22 @@ export default function Dashboard() {
         <KpiCard label={rol === 'enfermera' ? 'Pacientes Activos' : 'Casos Criticos'} value={rol === 'enfermera' ? pacientes.length : criticos} meta={rol === 'enfermera' ? 'En turno actual' : 'Requieren atencion inmediata'} accent="red" />
       </div>
 
+      <div className="impacto-grid">
+        {[
+          { icon: '\u23F1\uFE0F', label: 'Diagnostico <30s', sub: 'Antes: 15-45 min' },
+          { icon: '\u{1F48A}', label: 'Dosis automatica', sub: '0 errores de calculo' },
+          { icon: '\u{1F514}', label: 'Notif. inmediata', sub: 'Medico-Enfermera' },
+          { icon: '\u{1F534}', label: 'Priorizacion IA', sub: 'Semaforo 4 niveles' },
+          { icon: '\u{1F4CB}', label: 'Historial integrado', sub: 'Auditoria completa' },
+        ].map((item, i) => (
+          <div key={i} className="impacto-card">
+            <div className="check">{'\u2705'}</div>
+            <div style={{ fontWeight: 600 }}>{item.icon} {item.label}</div>
+            <div style={{ fontSize: 9, color: 'var(--gray-500)', marginTop: 2 }}>{item.sub}</div>
+          </div>
+        ))}
+      </div>
+
       {rol === 'enfermera' && pacientes.some(p => p.estado === 'formulacion_aprobada') && (
         <div className="card" style={{ marginBottom: 16, border: '2px solid var(--green-600)' }}>
           <div className="card-header" style={{ background: 'var(--green-50)', color: 'var(--green-600)' }}>
@@ -199,7 +215,7 @@ export default function Dashboard() {
               </thead>
               <tbody>
                 {filtered.map(p => (
-                  <tr key={p.id} className="clickable" onClick={() => !p.diagnostico && rol !== 'enfermera' && solicitarDiagnostico(p)}>
+                  <tr key={p.id} className={`clickable ${p.riesgo === 'CRITICO' ? 'critico-row' : ''}`} onClick={() => !p.diagnostico && rol !== 'enfermera' && solicitarDiagnostico(p)}>
                     <td><SemaforoBadge riesgo={p.riesgo} /></td>
                     <td>
                       <div className="cell-paciente">{p.nombre}</div>

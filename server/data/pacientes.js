@@ -1,5 +1,28 @@
 const pacientes = [
   {
+    id: 1000,
+    nombre: "Pedro Antonio Gomez",
+    edad: 62,
+    peso_kg: 88.0,
+    tipo_sangre: "A+",
+    presion_sistolica: 168,
+    presion_diastolica: 102,
+    frecuencia_cardiaca: 94,
+    temperatura_c: 38.3,
+    saturacion_o2: 95,
+    glucosa_mgdl: 195,
+    trigliceridos_mgdl: 580,
+    creatinina_mgdl: 1.6,
+    hemoglobina: 13.5,
+    leucocitos: 13200,
+    sintomas: ["dolor toracico", "dificultad respiratoria", "mareo", "poliuria", "sed intensa"],
+    antecedentes: ["hipertension", "diabetes tipo 2", "dislipidemia"],
+    alergias: ["penicilina", "aspirina"],
+    diagnostico: null,
+    estado: "pendiente",
+    riesgo: "MEDIO"
+  },
+  {
     id: 1001,
     nombre: "Carlos Andres Martinez",
     edad: 58,

@@ -34,7 +34,10 @@ router.post("/:id", (req, res) => {
 
   const formula = medicacion[0];
   paciente.medicacion = formula;
-  paciente.estado = "formulacion_pendiente";
+  const estadosAvanzados = ["formulacion_pendiente","formulacion_aprobada","formulacion_rechazada","medicamento_administrado"];
+  if (!estadosAvanzados.includes(paciente.estado)) {
+    paciente.estado = "formulacion_pendiente";
+  }
 
   const insuficienciaRenal = paciente.creatinina_mgdl > 1.3;
   const esGeriatrico = paciente.edad > 65;

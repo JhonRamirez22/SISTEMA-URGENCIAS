@@ -161,6 +161,7 @@ router.get("/:id", (req, res) => {
   resultado.peso_kg = paciente.peso_kg;
   resultado.tipo_sangre = paciente.tipo_sangre;
   resultado.sintomas = paciente.sintomas;
+  resultado.estado = paciente.estado;
 
   res.json(resultado);
 });

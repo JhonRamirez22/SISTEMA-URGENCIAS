@@ -17,6 +17,7 @@ export default function DiagnosticoIA() {
   const [accion, setAccion] = useState(null)
   const [elapsed, setElapsed] = useState(0)
   const [readonly, setReadonly] = useState(false)
+  const [confirmStep, setConfirmStep] = useState(0)
 
   useEffect(() => {
     async function load() {
@@ -72,6 +73,7 @@ export default function DiagnosticoIA() {
       })
       if (!res.ok) throw new Error()
       addToast('Diagnostico confirmado exitosamente', 'success')
+      setConfirmStep(0)
       navigate(`/formulacion/${id}`)
     } catch (e) {
       addToast('Error al confirmar diagnostico', 'critico')
@@ -211,9 +213,21 @@ export default function DiagnosticoIA() {
       <div className="actions-bar">
         {puedeConfirmar && (
           <>
-            <button className="btn btn-success btn-lg" onClick={() => setShowConfirm(true)}>
-              {'\u2705'} CONFIRMAR DIAGNOSTICO
-            </button>
+            {confirmStep === 0 ? (
+              <button className="btn btn-success btn-lg" onClick={() => setConfirmStep(1)}>
+                {'\u2705'} CONFIRMAR DIAGNOSTICO
+              </button>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--green-50)', border: '1px solid var(--green-600)', borderRadius: 8, padding: '12px 16px' }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--green-600)' }}>
+                  {'\u26A0\uFE0F'} Confirmar {diagPrincipal?.enfermedad} ({diagPrincipal?.confianza_IA}%) para {resultado.nombre}?
+                </span>
+                <button className="btn btn-success" onClick={confirmarDiagnostico} disabled={accion === 'confirmando'}>
+                  {accion === 'confirmando' ? 'Confirmando...' : 'Si, confirmar'}
+                </button>
+                <button className="btn btn-ghost" onClick={() => setConfirmStep(0)}>Cancelar</button>
+              </div>
+            )}
             <button className="btn btn-danger btn-lg" onClick={() => setShowReject(true)}>
               {'\u274C'} RECHAZAR DIAGNOSTICO
             </button>
@@ -225,23 +239,6 @@ export default function DiagnosticoIA() {
           </div>
         )}
       </div>
-
-      <ModalConfirmacion
-        open={showConfirm}
-        title="Confirmar Diagnostico IA"
-        onConfirm={confirmarDiagnostico}
-        onCancel={() => setShowConfirm(false)}
-        confirmLabel="Confirmar y Proceder a Formulacion"
-        confirmVariant="success"
-        loading={accion === 'confirmando'}
-      >
-        <p style={{ fontSize: 14, marginBottom: 8 }}>Esta por confirmar el diagnostico:</p>
-        <div style={{ background: 'var(--blue-50)', padding: 12, borderRadius: 8 }}>
-          <strong>{diagPrincipal?.enfermedad}</strong> — {diagPrincipal?.confianza_IA}% confianza<br />
-          <span style={{ fontSize: 12, color: 'var(--gray-600)' }}>Paciente: {resultado.nombre} | Riesgo: {resultado.riesgo}</span>
-        </div>
-        <p style={{ fontSize: 11, color: 'var(--gray-500)', marginTop: 8 }}>Al confirmar se habilitara la formulacion farmacologica.</p>
-      </ModalConfirmacion>
 
       <ModalConfirmacion
         open={showReject}

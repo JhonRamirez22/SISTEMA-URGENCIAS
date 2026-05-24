@@ -28,15 +28,36 @@ function evaluarDiagnostico(paciente, regla) {
     paciente.sintomas.some(ps => ps.toLowerCase().includes(s.toLowerCase()))
   ).length;
 
-  if (condicionesCumplidas === 0 && coincidenciaSintomas === 0) {
+  const antecedenteMatch = (paciente.antecedentes || []).some(a =>
+    regla.enfermedad.toLowerCase().includes(a.toLowerCase()) ||
+    a.toLowerCase().includes(regla.enfermedad.toLowerCase())
+  );
+  const antecedenteRelacionado = (paciente.antecedentes || []).some(a => {
+    const mapRel = {
+      hipertension: ["Crisis Hipertensiva", "Hipertension Arterial"],
+      diabetes: ["Cetoacidosis Diabetica", "Diabetes Mellitus Tipo 2"],
+      dislipidemia: ["Hipertrigliceridemia Severa"],
+      coronario: ["Sindrome Coronario Agudo"],
+      renal: ["Insuficiencia Renal Aguda"]
+    };
+    for (const [key, diseases] of Object.entries(mapRel)) {
+      if (a.toLowerCase().includes(key) && diseases.includes(regla.enfermedad)) return true;
+    }
+    return false;
+  });
+
+  if (condicionesCumplidas === 0 && coincidenciaSintomas === 0 && !antecedenteRelacionado) {
     return { coincide: false, confianza: 0 };
   }
 
-  let confianza = (condicionesCumplidas / Math.max(totalCondiciones, 1)) * 70;
-  confianza += (coincidenciaSintomas / Math.max(regla.sintomas_clave.length, 1)) * 30;
+  let confianza = (condicionesCumplidas / Math.max(totalCondiciones, 1)) * 60;
+  confianza += (coincidenciaSintomas / Math.max(regla.sintomas_clave.length, 1)) * 25;
+  if (antecedenteMatch || antecedenteRelacionado) {
+    confianza += 15;
+  }
 
   return {
-    coincide: confianza >= 30,
+    coincide: confianza >= 25,
     confianza: Math.min(Math.round(confianza * 10) / 10, 100)
   };
 }
@@ -165,7 +186,7 @@ function analizarPaciente(paciente) {
     riesgo: riesgoGeneral,
     examenes_alterados: contarAlterados(paciente),
     total_examenes: 7,
-    estado: "PENDIENTE DE CONFIRMACION MEDICA"
+    estado: paciente.estado || "pendiente"
   };
 }
 
