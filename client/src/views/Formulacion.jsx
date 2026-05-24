@@ -66,6 +66,18 @@ export default function Formulacion() {
     setAccion(null)
   }
 
+  const administrar = async () => {
+    setAccion('administrando')
+    try {
+      const res = await fetch(`/api/formular/${id}/administrar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rol }) })
+      if (res.ok) {
+        setData(prev => ({ ...prev, estado: 'medicamento_administrado' }))
+        addToast(`Medicamento administrado a ${paciente.nombre}`, 'success', 5000)
+      }
+    } catch (e) { addToast('Error al registrar administracion', 'critico') }
+    setAccion(null)
+  }
+
   if (loading) return (
     <div className="page-content">
       <div className="loading"><div className="spinner" /><p>Calculando formulacion farmacologica...</p></div>
@@ -149,14 +161,27 @@ export default function Formulacion() {
             )}
 
             {esAprobado && (
-              <div className="banner banner-success">
-                {'\u2705'} FORMULA APROBADA. Notificacion enviada a enfermeria para distribucion.
-              </div>
+              <>
+                <div className="banner banner-success">
+                  {'\u2705'} FORMULA APROBADA. Medicamento listo para administrar.
+                </div>
+                {rol === 'enfermera' && (
+                  <button className="btn btn-success btn-lg btn-block" style={{ marginBottom: 16 }} onClick={administrar} disabled={accion === 'administrando'}>
+                    {'\u{1F48A}'} {accion === 'administrando' ? 'Registrando...' : `Administrar ${formula.medicamento} ${formula.dosis_total_mg} mg a ${paciente.nombre}`}
+                  </button>
+                )}
+              </>
             )}
 
             {esRechazado && (
               <div className="banner banner-error">
                 {'\u274C'} FORMULA RECHAZADA.
+              </div>
+            )}
+
+            {data.estado === 'medicamento_administrado' && (
+              <div className="banner banner-info">
+                {'\u2705'} MEDICAMENTO ADMINISTRADO. Tratamiento completado y registrado en auditoria.
               </div>
             )}
 

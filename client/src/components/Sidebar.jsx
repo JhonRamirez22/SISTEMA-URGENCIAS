@@ -20,7 +20,10 @@ export default function Sidebar({ notificacionesCount }) {
 
   const links = [
     { to: '/', icon: '\u{1F4CA}', label: 'Panel Principal' },
-    { to: '/paciente/nuevo', icon: '\u{2795}', label: 'Nuevo Ingreso' },
+    ...(rol === 'enfermera'
+      ? []
+      : [{ to: '/paciente/nuevo', icon: '\u{2795}', label: 'Nuevo Ingreso' }]
+    ),
     { to: '/auditoria', icon: '\u{1F4CB}', label: 'Auditoria', roles: ['medico', 'admin'] },
   ]
 

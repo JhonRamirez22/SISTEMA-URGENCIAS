@@ -3,6 +3,7 @@ const router = express.Router();
 const pacientes = require("../data/pacientes");
 const { calcularMedicacion } = require("../motor_ia");
 const { registrarAuditoria } = require("../auditoria");
+const { agregarNotificacion } = require("./notificaciones");
 
 router.post("/:id", (req, res) => {
   const id = parseInt(req.params.id);
@@ -93,6 +94,12 @@ router.post("/:id/aprobar", (req, res) => {
     dosisFinal: paciente.medicacion?.dosis_total_mg
   });
 
+  agregarNotificacion({
+    icono: "cloud_upload",
+    mensaje: `FORMULA APROBADA - ${paciente.medicacion?.medicamento} ${paciente.medicacion?.dosis_total_mg} mg para #${paciente.id} ${paciente.nombre}. ENFERMERIA: administrar al paciente.`,
+    paciente_id: id
+  });
+
   res.json({
     mensaje: "Formula aprobada. Medicamento autorizado para distribucion.",
     estado: paciente.estado,
@@ -128,6 +135,12 @@ router.post("/:id/ajustar", (req, res) => {
     dosisFinal: parseFloat(nuevaDosis)
   });
 
+  agregarNotificacion({
+    icono: "cloud_upload",
+    mensaje: `DOSIS AJUSTADA y APROBADA - ${paciente.medicacion?.medicamento} ${nuevaDosis} mg para #${paciente.id} ${paciente.nombre}. ENFERMERIA: administrar dosis ajustada.`,
+    paciente_id: id
+  });
+
   res.json({
     mensaje: "Dosis ajustada y formula aprobada.",
     nuevaDosis: parseFloat(nuevaDosis),
@@ -156,10 +169,48 @@ router.post("/:id/rechazar", (req, res) => {
     detalle: motivo || "Sin motivo especificado"
   });
 
+  agregarNotificacion({
+    icono: "warning",
+    mensaje: `FORMULA RECHAZADA - Paciente #${paciente.id} ${paciente.nombre}. Motivo: ${motivo || 'No especificado'}.`,
+    paciente_id: id
+  });
+
   res.json({
     mensaje: "Formulacion rechazada.",
     estado: paciente.estado,
     auditoria: registro
+  });
+});
+
+router.post("/:id/administrar", (req, res) => {
+  const id = parseInt(req.params.id);
+  const { rol } = req.body || {};
+  const paciente = pacientes.find(p => p.id === id);
+  if (!paciente) return res.status(404).json({ error: "Paciente no encontrado" });
+
+  if (paciente.estado !== "formulacion_aprobada" && paciente.estado !== "medicamento_administrado") {
+    return res.status(400).json({ error: "Solo se puede administrar formulas aprobadas" });
+  }
+
+  paciente.estado = "medicamento_administrado";
+
+  registrarAuditoria({
+    pacienteId: id,
+    accion: "MEDICAMENTO_ADMINISTRADO",
+    rol: rol || "enfermera",
+    detalle: `${paciente.medicacion?.medicamento} ${paciente.medicacion?.dosis_total_mg} mg administrado a ${paciente.nombre}`,
+    dosisFinal: paciente.medicacion?.dosis_total_mg
+  });
+
+  agregarNotificacion({
+    icono: "check",
+    mensaje: `MEDICAMENTO ADMINISTRADO - ${paciente.medicacion?.medicamento} ${paciente.medicacion?.dosis_total_mg} mg a #${paciente.id} ${paciente.nombre}. Tratamiento completado.`,
+    paciente_id: id
+  });
+
+  res.json({
+    mensaje: "Medicamento administrado exitosamente.",
+    estado: paciente.estado
   });
 });
 

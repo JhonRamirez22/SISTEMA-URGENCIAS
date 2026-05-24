@@ -30,19 +30,19 @@ export default function Dashboard() {
 
     const interval = setInterval(() => {
       setTimer(prev => prev + 1)
-      if (Math.random() > 0.7) {
-        fetch('/api/notificaciones')
-          .then(r => r.json())
-          .then(n => { setNotifCount(n.length); return n; })
-          .then(n => {
-            if (n.length > 0 && Math.random() > 0.5) {
-              addToast(n[0].mensaje, 'info', 5000)
-            }
-          })
-      }
-    }, 20000)
+      fetch('/api/notificaciones')
+        .then(r => r.json())
+        .then(n => {
+          if (n.length > notifCount && n.length > 0) {
+            setNotifCount(n.length)
+            addToast(n[0].mensaje, n[0].icono === 'warning' ? 'warning' : 'info', 6000)
+          }
+          setNotifCount(n.length)
+        })
+        .catch(() => {})
+    }, 10000)
     return () => clearInterval(interval)
-  }, [])
+  }, [notifCount])
 
   const filtered = useMemo(() => {
     let list = [...pacientes]
@@ -100,9 +100,61 @@ export default function Dashboard() {
       <div className="kpi-grid">
         <KpiCard label="Pacientes en Espera" value={pendientes} meta={`${pacientes.length} totales registrados`} accent="blue" />
         <KpiCard label="Diagnosticados" value={diagnosticados} meta="Por motor IA" accent="orange" />
-        <KpiCard label="Formulas Aprobadas" value={aprobados} meta="Pendientes de distribucion" accent="green" />
-        <KpiCard label="Casos Criticos" value={criticos} meta="Requieren atencion inmediata" accent="red" />
+        <KpiCard label={rol === 'enfermera' ? 'Medicamentos por Administrar' : 'Formulas Aprobadas'} value={aprobados} meta={rol === 'enfermera' ? 'Pendientes de administrar' : 'Pendientes de distribucion'} accent="green" />
+        <KpiCard label={rol === 'enfermera' ? 'Pacientes Activos' : 'Casos Criticos'} value={rol === 'enfermera' ? pacientes.length : criticos} meta={rol === 'enfermera' ? 'En turno actual' : 'Requieren atencion inmediata'} accent="red" />
       </div>
+
+      {rol === 'enfermera' && pacientes.some(p => p.estado === 'formulacion_aprobada') && (
+        <div className="card" style={{ marginBottom: 16, border: '2px solid var(--green-600)' }}>
+          <div className="card-header" style={{ background: 'var(--green-50)', color: 'var(--green-600)' }}>
+            {'\u{1F48A}'} Medicamentos Aprobados para Administrar
+            <span className="badge badge-approved">{pacientes.filter(p => p.estado === 'formulacion_aprobada').length}</span>
+          </div>
+          <div className="card-body">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Paciente</th>
+                  <th>Medicamento</th>
+                  <th>Dosis</th>
+                  <th>Via</th>
+                  <th>Frecuencia</th>
+                  <th>Accion</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pacientes.filter(p => p.estado === 'formulacion_aprobada' || p.estado === 'medicamento_administrado').map(p => (
+                  <tr key={p.id} style={p.estado === 'medicamento_administrado' ? { opacity: 0.5 } : {}}>
+                    <td>
+                      <div className="cell-paciente">{p.nombre}</div>
+                      <div className="cell-id">#{p.id} — {p.edad}a</div>
+                    </td>
+                    <td className="cell-paciente">{p.medicacion?.medicamento || '—'}</td>
+                    <td>{p.medicacion?.dosis_total_mg ? `${p.medicacion.dosis_total_mg} mg` : '—'}</td>
+                    <td>{p.medicacion?.via || '—'}</td>
+                    <td>{p.medicacion?.frecuencia || '—'}</td>
+                    <td>
+                      {p.estado === 'formulacion_aprobada' ? (
+                        <button className="btn btn-success btn-sm" onClick={async (e) => {
+                          e.stopPropagation()
+                          await fetch(`/api/formular/${p.id}/administrar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rol }) })
+                          addToast(`Medicamento administrado a ${p.nombre}`, 'success', 5000)
+                          const updated = await fetch('/api/pacientes').then(r => r.json())
+                          setPacientes(updated)
+                        }}>
+                          {'\u{1F48A}'} Administrar
+                        </button>
+                      ) : (
+                        <span className="badge badge-low">Administrado</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="grid-2" style={{ marginBottom: 20 }}>
         <div className="card" style={{ gridRow: 'span 2' }}>

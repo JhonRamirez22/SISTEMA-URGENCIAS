@@ -3,6 +3,7 @@ const router = express.Router();
 const pacientes = require("../data/pacientes");
 const { analizarPaciente } = require("../motor_ia");
 const { registrarAuditoria } = require("../auditoria");
+const { agregarNotificacion } = require("./notificaciones");
 
 router.post("/:id", (req, res) => {
   const id = parseInt(req.params.id);
@@ -44,6 +45,12 @@ router.post("/:id", (req, res) => {
     });
   }
 
+  agregarNotificacion({
+    icono: "check",
+    mensaje: `Diagnostico IA generado - Paciente #${paciente.id} ${paciente.nombre} (${resultado.diagnosticos[0]?.enfermedad || 'N/A'} - ${resultado.diagnosticos[0]?.confianza_IA || 0}%) requiere confirmacion`,
+    paciente_id: id
+  });
+
   res.json(resultado);
 });
 
@@ -64,6 +71,12 @@ router.post("/:id/confirmar", (req, res) => {
     accion: "CONFIRMAR_DIAGNOSTICO",
     rol,
     detalle: `Diagnostico confirmado: ${paciente.diagnostico?.enfermedad || "N/A"}`
+  });
+
+  agregarNotificacion({
+    icono: "check",
+    mensaje: `Diagnostico CONFIRMADO - Paciente #${paciente.id} ${paciente.nombre}: ${paciente.diagnostico?.enfermedad || 'N/A'} (${paciente.diagnostico?.confianza_IA || 0}%). Proceder a formulacion.`,
+    paciente_id: id
   });
 
   res.json({
@@ -91,6 +104,12 @@ router.post("/:id/rechazar", (req, res) => {
     accion: "RECHAZAR_DIAGNOSTICO",
     rol,
     detalle: motivo || "Sin motivo especificado"
+  });
+
+  agregarNotificacion({
+    icono: "warning",
+    mensaje: `Diagnostico RECHAZADO - Paciente #${paciente.id} ${paciente.nombre}. Motivo: ${motivo || 'No especificado'}. Se requiere diagnostico manual.`,
+    paciente_id: id
   });
 
   res.json({
