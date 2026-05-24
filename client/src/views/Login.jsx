@@ -9,7 +9,6 @@ const CREDENCIALES = {
 
 export default function Login({ onLogin }) {
   const { setRol } = useContext(RolContext)
-  const navigate = useNavigate()
   const [rol, setRolLocal] = useState('medico')
   const [usuario, setUsuario] = useState('')
   const [clave, setClave] = useState('')
