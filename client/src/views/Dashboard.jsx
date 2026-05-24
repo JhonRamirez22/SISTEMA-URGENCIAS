@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, useMemo, startTransition } from 'react'
+import { useState, useEffect, useContext, useMemo, useRef, useCallback, startTransition } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { RolContext } from '../App'
 import KpiCard from '../components/KpiCard'
@@ -18,36 +18,43 @@ export default function Dashboard() {
   const [filtroEstado, setFiltroEstado] = useState('todos')
   const [sortBy, setSortBy] = useState('riesgo')
   const [notifCount, setNotifCount] = useState(0)
-  const [timer, setTimer] = useState(0)
+  const [fetchError, setFetchError] = useState(null)
+  const [lastRefresh, setLastRefresh] = useState(null)
+  const intervalRef = useRef(null)
+
+  const fetchPacientes = useCallback(async () => {
+    try {
+      const res = await fetch('/api/pacientes', { cache: 'no-store' })
+      if (!res.ok) throw new Error(`Error ${res.status}`)
+      const data = await res.json()
+      setPacientes(data)
+      setLastRefresh(new Date())
+      setFetchError(null)
+    } catch (e) {
+      console.error('Error al cargar pacientes:', e)
+      setFetchError('Error al conectar con el servidor')
+    }
+  }, [])
+
+  const fetchNotificaciones = useCallback(async () => {
+    try {
+      const res = await fetch('/api/notificaciones', { cache: 'no-store' })
+      const n = await res.json()
+      if (n.length > notifCount && n.length > 0 && notifCount > 0) {
+        addToast(n[0].mensaje, n[0].icono === 'warning' ? 'warning' : 'info', 6000)
+      }
+      setNotifCount(n.length)
+    } catch (e) { /* silencioso para polling */ }
+  }, [notifCount, addToast])
 
   useEffect(() => {
-    fetch('/api/pacientes')
-      .then(r => r.json())
-      .then(setPacientes)
-    fetch('/api/notificaciones')
-      .then(r => r.json())
-      .then(n => setNotifCount(n.length))
-
-    const interval = setInterval(() => {
-      setTimer(prev => prev + 1)
-      fetch('/api/notificaciones')
-        .then(r => r.json())
-        .then(n => {
-          if (n.length > notifCount && n.length > 0) {
-            setNotifCount(n.length)
-            addToast(n[0].mensaje, n[0].icono === 'warning' ? 'warning' : 'info', 6000)
-          }
-          setNotifCount(n.length)
-        })
-        .catch(() => {})
+    fetchPacientes()
+    fetchNotificaciones()
+    intervalRef.current = setInterval(() => {
+      fetchPacientes()
+      fetchNotificaciones()
     }, 10000)
-    return () => clearInterval(interval)
-  }, [notifCount])
-
-  useEffect(() => {
-    fetch('/api/pacientes')
-      .then(r => r.json())
-      .then(setPacientes)
+    return () => clearInterval(intervalRef.current)
   }, [rol])
 
   const filtered = useMemo(() => {
@@ -126,7 +133,14 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {rol === 'enfermera' && pacientes.some(p => p.estado === 'formulacion_aprobada') && (
+      {fetchError && (
+        <div className="banner banner-error" style={{ marginBottom: 16 }}>
+          {'\u26A0\uFE0F'} {fetchError}
+          <button className="btn btn-sm btn-ghost" style={{ marginLeft: 12 }} onClick={fetchPacientes}>Reintentar</button>
+        </div>
+      )}
+
+      {rol === 'enfermera' && pacientes.some(p => p.estado === 'formulacion_aprobada' || p.estado === 'medicamento_administrado') && (
         <div className="card" style={{ marginBottom: 16, border: '2px solid var(--green-600)' }}>
           <div className="card-header" style={{ background: 'var(--green-50)', color: 'var(--green-600)' }}>
             {'\u{1F48A}'} Medicamentos Aprobados para Administrar
@@ -182,9 +196,19 @@ export default function Dashboard() {
         <div className="card" style={{ gridRow: 'span 2' }}>
           <div className="card-header">
             <span>Cola de Pacientes ({filtered.length})</span>
-            <button className="btn btn-sm btn-ghost" onClick={() => navigate('/paciente/nuevo')}>
-              {'\u2795'} Nuevo Ingreso
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {lastRefresh && (
+                <span style={{ fontSize: 10, color: 'var(--gray-500)' }}>
+                  Actualizado: {lastRefresh.toLocaleTimeString('es-CO')}
+                </span>
+              )}
+              <button className="btn btn-sm btn-ghost" onClick={fetchPacientes} title="Actualizar datos">
+                {'\u{1F504}'} Refrescar
+              </button>
+              <button className="btn btn-sm btn-ghost" onClick={() => navigate('/paciente/nuevo')}>
+                {'\u2795'} Nuevo Ingreso
+              </button>
+            </div>
           </div>
           <div className="card-body" style={{ padding: '12px 16px' }}>
             <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>

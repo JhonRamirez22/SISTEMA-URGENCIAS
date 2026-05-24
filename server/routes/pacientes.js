@@ -3,6 +3,7 @@ const router = express.Router();
 const pacientes = require("../data/pacientes");
 
 router.get("/", (req, res) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
   const lista = pacientes.map(p => ({
     id: p.id,
     nombre: p.nombre,
@@ -14,7 +15,18 @@ router.get("/", (req, res) => {
     estado: p.estado,
     antecedentes: p.antecedentes,
     alergias: p.alergias,
-    sintomas: p.sintomas
+    sintomas: p.sintomas,
+    medicacion: p.medicacion || null,
+    creatinina_mgdl: p.creatinina_mgdl,
+    hemoglobina: p.hemoglobina,
+    leucocitos: p.leucocitos,
+    presion_sistolica: p.presion_sistolica,
+    presion_diastolica: p.presion_diastolica,
+    frecuencia_cardiaca: p.frecuencia_cardiaca,
+    temperatura_c: p.temperatura_c,
+    saturacion_o2: p.saturacion_o2,
+    glucosa_mgdl: p.glucosa_mgdl,
+    trigliceridos_mgdl: p.trigliceridos_mgdl
   }));
   res.json(lista);
 });
