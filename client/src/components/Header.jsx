@@ -1,28 +1,28 @@
 import { useContext } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { RolContext } from '../App'
 
 export default function Header({ notificacionesCount }) {
   const { rol } = useContext(RolContext)
-
-  const doctores = {
-    medico: 'Dr. Oscar Andres Osorio',
-    enfermera: 'Enf. Maria Fernanda Lopez',
-    admin: 'Admin. Sistema IA'
-  }
+  const navigate = useNavigate()
+  const ahora = new Date()
+  const fecha = ahora.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  const hora = ahora.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
 
   return (
     <header className="header">
       <div className="header-left">
-        <span style={{ fontSize: 20 }}>{'\u{1F3E5}'}</span>
-        <span className="header-title">SISTEMA IA - SALA DE URGENCIAS</span>
+        <div className="header-icon">{'\u{1F3E5}'}</div>
+        <span className="header-title">Sala de Urgencias — Panel de Control</span>
       </div>
       <div className="header-right">
-        <span className="header-doctor">{doctores[rol]}</span>
-        <button className="notif-bell" title="Notificaciones">
+        <div className="header-meta">
+          <div className="turno">Turno activo</div>
+          <div className="fecha">{fecha} — {hora}</div>
+        </div>
+        <button className="notif-btn" onClick={() => navigate('/notificaciones')} title="Notificaciones">
           {'\u{1F514}'}
-          {notificacionesCount > 0 && (
-            <span className="notif-badge">{notificacionesCount}</span>
-          )}
+          {notificacionesCount > 0 && <span className="notif-badge">{notificacionesCount}</span>}
         </button>
       </div>
     </header>

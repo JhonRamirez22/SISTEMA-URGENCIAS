@@ -26,4 +26,43 @@ router.get("/:id", (req, res) => {
   res.json(p);
 });
 
+router.post("/", (req, res) => {
+  const { nombre, edad, peso_kg, tipo_sangre, presion_sistolica, presion_diastolica,
+    frecuencia_cardiaca, temperatura_c, saturacion_o2, glucosa_mgdl,
+    trigliceridos_mgdl, creatinina_mgdl, hemoglobina, leucocitos,
+    sintomas, antecedentes, alergias } = req.body;
+
+  if (!nombre || !edad || !peso_kg) {
+    return res.status(400).json({ error: "Nombre, edad y peso son obligatorios" });
+  }
+
+  const maxId = pacientes.reduce((max, p) => Math.max(max, p.id), 1000);
+  const nuevo = {
+    id: maxId + 1,
+    nombre,
+    edad: parseInt(edad),
+    peso_kg: parseFloat(peso_kg),
+    tipo_sangre: tipo_sangre || "O+",
+    presion_sistolica: parseInt(presion_sistolica) || 120,
+    presion_diastolica: parseInt(presion_diastolica) || 80,
+    frecuencia_cardiaca: parseInt(frecuencia_cardiaca) || 72,
+    temperatura_c: parseFloat(temperatura_c) || 36.5,
+    saturacion_o2: parseFloat(saturacion_o2) || 98,
+    glucosa_mgdl: parseFloat(glucosa_mgdl) || 90,
+    trigliceridos_mgdl: parseFloat(trigliceridos_mgdl) || 150,
+    creatinina_mgdl: parseFloat(creatinina_mgdl) || 1.0,
+    hemoglobina: parseFloat(hemoglobina) || 14,
+    leucocitos: parseInt(leucocitos) || 8000,
+    sintomas: Array.isArray(sintomas) ? sintomas : [],
+    antecedentes: Array.isArray(antecedentes) ? antecedentes : [],
+    alergias: Array.isArray(alergias) ? alergias : [],
+    diagnostico: null,
+    estado: "pendiente",
+    riesgo: "MEDIO"
+  };
+
+  pacientes.push(nuevo);
+  res.status(201).json(nuevo);
+});
+
 module.exports = router;

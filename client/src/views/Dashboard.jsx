@@ -1,96 +1,238 @@
-import { useState, useEffect, useContext } from 'react'
+import { useState, useEffect, useContext, useMemo, startTransition } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { RolContext } from '../App'
-import PacienteRow from '../components/PacienteRow'
-import ResumenRapido from '../components/ResumenRapido'
-import NotificacionesPanel from '../components/NotificacionesPanel'
+import KpiCard from '../components/KpiCard'
+import BuscadorPacientes from '../components/BuscadorPacientes'
+import { ToastContext } from '../components/ToastNotificacion'
+import SemaforoBadge from '../components/SemaforoBadge'
+
+const RIESGO_ORDER = { CRITICO: 0, ALTO: 1, MEDIO: 2, BAJO: 3 }
 
 export default function Dashboard() {
   const { rol } = useContext(RolContext)
+  const addToast = useContext(ToastContext)
   const navigate = useNavigate()
   const [pacientes, setPacientes] = useState([])
-  const [selected, setSelected] = useState(null)
-  const [loading, setLoading] = useState(false)
+  const [busqueda, setBusqueda] = useState('')
+  const [loadingId, setLoadingId] = useState(null)
+  const [filtroEstado, setFiltroEstado] = useState('todos')
+  const [sortBy, setSortBy] = useState('riesgo')
+  const [notifCount, setNotifCount] = useState(0)
+  const [timer, setTimer] = useState(0)
 
   useEffect(() => {
     fetch('/api/pacientes')
       .then(r => r.json())
-      .then(data => {
-        setPacientes(data)
-        if (data.length > 0) setSelected(data[0])
-      })
-      .catch(() => {})
+      .then(setPacientes)
+    fetch('/api/notificaciones')
+      .then(r => r.json())
+      .then(n => setNotifCount(n.length))
+
+    const interval = setInterval(() => {
+      setTimer(prev => prev + 1)
+      if (Math.random() > 0.7) {
+        fetch('/api/notificaciones')
+          .then(r => r.json())
+          .then(n => { setNotifCount(n.length); return n; })
+          .then(n => {
+            if (n.length > 0 && Math.random() > 0.5) {
+              addToast(n[0].mensaje, 'info', 5000)
+            }
+          })
+      }
+    }, 20000)
+    return () => clearInterval(interval)
   }, [])
 
-  const solicitarDiagnostico = async () => {
-    if (!selected) return
-    setLoading(true)
+  const filtered = useMemo(() => {
+    let list = [...pacientes]
+    if (busqueda) {
+      const q = busqueda.toLowerCase()
+      list = list.filter(p =>
+        p.nombre.toLowerCase().includes(q) ||
+        String(p.id).includes(q)
+      )
+    }
+    if (filtroEstado === 'pendiente') list = list.filter(p => p.estado.includes('pendiente'))
+    else if (filtroEstado === 'diagnosticado') list = list.filter(p => p.diagnostico)
+    else if (filtroEstado === 'aprobado') list = list.filter(p => p.estado === 'formulacion_aprobada')
+    else if (filtroEstado === 'critico') list = list.filter(p => p.riesgo === 'CRITICO' || p.riesgo === 'ALTO')
+
+    list.sort((a, b) => {
+      if (sortBy === 'riesgo') return (RIESGO_ORDER[a.riesgo] || 99) - (RIESGO_ORDER[b.riesgo] || 99)
+      if (sortBy === 'nombre') return a.nombre.localeCompare(b.nombre)
+      if (sortBy === 'id') return a.id - b.id
+      return 0
+    })
+    return list
+  }, [pacientes, busqueda, filtroEstado, sortBy])
+
+  const solicitarDiagnostico = async (paciente) => {
+    setLoadingId(paciente.id)
+    const start = performance.now()
     try {
-      await fetch(`/api/diagnosticar/${selected.id}`, {
+      await fetch(`/api/diagnosticar/${paciente.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rol })
       })
-      navigate(`/diagnostico/${selected.id}`)
+      const ms = Math.round(performance.now() - start)
+      startTransition(() => {
+        addToast(`Diagnostico generado en ${ms}ms para ${paciente.nombre}`, 'success', 5000)
+        navigate(`/diagnostico/${paciente.id}`)
+      })
     } catch (e) {
-      // fall through
+      addToast('Error al solicitar diagnostico', 'critico', 5000)
     }
-    setLoading(false)
+    setLoadingId(null)
   }
 
-  const pacienteSeleccionado = pacientes.find(p => p.id === selected?.id)
+  const diagnosticados = pacientes.filter(p => p.diagnostico).length
+  const pendientes = pacientes.filter(p => !p.diagnostico).length
+  const aprobados = pacientes.filter(p => p.estado === 'formulacion_aprobada').length
+  const criticos = pacientes.filter(p => p.riesgo === 'CRITICO' || p.riesgo === 'ALTO').length
+
+  const estados = { pendiente: pacientes.filter(p => p.estado === 'pendiente').length, diagnosticado: diagnosticados, aprobado: aprobados }
+  const maxBar = Math.max(...Object.values(estados), 1)
 
   return (
-    <div style={{ paddingTop: 20 }}>
+    <div className="page-content">
+      <div className="kpi-grid">
+        <KpiCard label="Pacientes en Espera" value={pendientes} meta={`${pacientes.length} totales registrados`} accent="blue" />
+        <KpiCard label="Diagnosticados" value={diagnosticados} meta="Por motor IA" accent="orange" />
+        <KpiCard label="Formulas Aprobadas" value={aprobados} meta="Pendientes de distribucion" accent="green" />
+        <KpiCard label="Casos Criticos" value={criticos} meta="Requieren atencion inmediata" accent="red" />
+      </div>
+
       <div className="grid-2" style={{ marginBottom: 20 }}>
-        <div className="panel">
-          <div className="panel-header">
-            PACIENTES EN ESPERA DE DIAGNOSTICO
-            <span className="subtitle">({pacientes.length} pacientes)</span>
+        <div className="card" style={{ gridRow: 'span 2' }}>
+          <div className="card-header">
+            <span>Cola de Pacientes ({filtered.length})</span>
+            <button className="btn btn-sm btn-ghost" onClick={() => navigate('/paciente/nuevo')}>
+              {'\u2795'} Nuevo Ingreso
+            </button>
           </div>
-          <div className="panel-body" style={{ padding: '8px' }}>
-            {pacientes.map(p => (
-              <div key={p.id}>
-                <PacienteRow
-                  paciente={p}
-                  selected={selected?.id === p.id}
-                  onSelect={setSelected}
-                />
-                {pacientes.indexOf(p) < pacientes.length - 1 && <hr className="separator" />}
+          <div className="card-body" style={{ padding: '12px 16px' }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+              <BuscadorPacientes value={busqueda} onChange={setBusqueda} placeholder="Buscar por nombre o ID..." />
+              <select className="form-select" style={{ width: 'auto' }} value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)}>
+                <option value="todos">Todos los estados</option>
+                <option value="pendiente">Pendientes</option>
+                <option value="diagnosticado">Diagnosticados</option>
+                <option value="aprobado">Aprobados</option>
+                <option value="critico">Criticos / Altos</option>
+              </select>
+              <select className="form-select" style={{ width: 'auto' }} value={sortBy} onChange={e => setSortBy(e.target.value)}>
+                <option value="riesgo">Ordenar por Riesgo</option>
+                <option value="nombre">Ordenar por Nombre</option>
+                <option value="id">Ordenar por ID</option>
+              </select>
+            </div>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th style={{ width: 40 }}></th>
+                  <th>Paciente</th>
+                  <th>Diagnostico</th>
+                  <th>Estado</th>
+                  <th>Riesgo</th>
+                  <th style={{ width: 120 }}>Accion</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(p => (
+                  <tr key={p.id} className="clickable" onClick={() => !p.diagnostico && solicitarDiagnostico(p)}>
+                    <td><SemaforoBadge riesgo={p.riesgo} /></td>
+                    <td>
+                      <div className="cell-paciente">{p.nombre}</div>
+                      <div className="cell-id">ID #{p.id} — {p.edad}a — {p.tipo_sangre}</div>
+                    </td>
+                    <td>
+                      {p.diagnostico ? (
+                        <><span style={{ fontWeight: 600 }}>{p.diagnostico.enfermedad}</span><br /><span className="cell-sub">{p.diagnostico.confianza_IA}% confianza</span></>
+                      ) : <span className="cell-sub">Sin diagnosticar</span>}
+                    </td>
+                    <td>
+                      {p.estado === 'pendiente' && <span className="badge badge-pending">Pendiente</span>}
+                      {p.estado === 'diagnostico_pendiente' && <span className="badge badge-pending">Dx Pendiente</span>}
+                      {p.estado === 'diagnostico_confirmado' && <span className="badge badge-high">Confirmado</span>}
+                      {p.estado === 'formulacion_pendiente' && <span className="badge badge-medium">Formula Pendiente</span>}
+                      {p.estado === 'formulacion_aprobada' && <span className="badge badge-approved">Aprobada</span>}
+                      {p.estado === 'formulacion_rechazada' && <span className="badge badge-rejected">Rechazada</span>}
+                    </td>
+                    <td>
+                      <span className={`badge badge-${p.riesgo === 'CRITICO' ? 'critical' : p.riesgo === 'ALTO' ? 'high' : p.riesgo === 'MEDIO' ? 'medium' : 'low'}`}>
+                        {p.riesgo}
+                      </span>
+                    </td>
+                    <td>
+                      {!p.diagnostico && (
+                        <button className="btn btn-primary btn-sm" onClick={(e) => { e.stopPropagation(); solicitarDiagnostico(p); }} disabled={loadingId === p.id}>
+                          {loadingId === p.id ? '...' : 'Diagnosticar IA'}
+                        </button>
+                      )}
+                      {p.diagnostico && (
+                        <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); navigate(`/diagnostico/${p.id}`); }}>
+                          Ver {'\u2192'}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {filtered.length === 0 && (
+                  <tr><td colSpan={6} style={{ textAlign: 'center', padding: 30, color: '#999' }}>No se encontraron pacientes</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-header">Distribucion de Estados</div>
+          <div className="card-body">
+            <div className="react-chart">
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+                <span style={{ fontSize: 10, fontWeight: 600, marginBottom: 4 }}>{estados.pendiente}</span>
+                <div className="bar" style={{ height: `${(estados.pendiente / maxBar) * 100}%`, background: 'var(--blue-500)' }} />
+                <span className="bar-label">Pendientes</span>
               </div>
-            ))}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+                <span style={{ fontSize: 10, fontWeight: 600, marginBottom: 4 }}>{estados.diagnosticado}</span>
+                <div className="bar" style={{ height: `${(estados.diagnosticado / maxBar) * 100}%`, background: 'var(--orange-600)' }} />
+                <span className="bar-label">Diagnosticados</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+                <span style={{ fontSize: 10, fontWeight: 600, marginBottom: 4 }}>{estados.aprobado}</span>
+                <div className="bar" style={{ height: `${(estados.aprobado / maxBar) * 100}%`, background: 'var(--green-600)' }} />
+                <span className="bar-label">Aprobados</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="panel">
-          <div className="panel-header">
-            RESUMEN RAPIDO - {pacienteSeleccionado?.nombre || 'Seleccione un paciente'}
+        <div className="card">
+          <div className="card-header">Rendimiento del Sistema</div>
+          <div className="card-body">
+            <div style={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center' }}>
+              <div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--blue-800)' }}>{'<'}30s</div>
+                <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>Tiempo Dx IA</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--green-600)' }}>99.99%</div>
+                <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>Integridad Transaccional</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--orange-600)' }}>{notifCount}</div>
+                <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>Alertas Activas</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--gray-800)' }}>{pacientes.length}</div>
+                <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>Pacientes Turno</div>
+              </div>
+            </div>
           </div>
-          <ResumenRapido paciente={pacienteSeleccionado} />
         </div>
-      </div>
-
-      <div className="panel" style={{ marginBottom: 20 }}>
-        <div className="panel-header">NOTIFICACIONES RECIENTES</div>
-        <NotificacionesPanel />
-      </div>
-
-      <div className="actions-bar" style={{ justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', gap: 14 }}>
-          <button className="btn btn-primary btn-lg">
-            + NUEVO PACIENTE
-          </button>
-          <button className="btn btn-lg">
-            VER TODOS
-          </button>
-        </div>
-        <button
-          className="btn btn-primary btn-lg"
-          onClick={solicitarDiagnostico}
-          disabled={!selected || loading}
-        >
-          {loading ? 'ANALIZANDO...' : 'SOLICITAR DIAGNOSTICO IA PARA SELECCIONADO'}
-        </button>
       </div>
     </div>
   )
