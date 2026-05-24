@@ -16,22 +16,52 @@ export default function DiagnosticoIA() {
   const [showReject, setShowReject] = useState(false)
   const [accion, setAccion] = useState(null)
   const [elapsed, setElapsed] = useState(0)
+  const [readonly, setReadonly] = useState(false)
 
   useEffect(() => {
-    const start = performance.now()
-    fetch(`/api/diagnosticar/${id}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rol })
-    })
-      .then(r => r.json())
-      .then(data => {
+    async function load() {
+      setLoading(true)
+      try {
+        const checkRes = await fetch(`/api/diagnosticar/${id}`)
+        const checkData = await checkRes.json()
+
+        const estadoAvanzado = checkData.estado &&
+          (checkData.estado.includes('confirmado') ||
+           checkData.estado.includes('formulacion') ||
+           checkData.estado.includes('aprobada') ||
+           checkData.estado.includes('rechazada') ||
+           checkData.estado.includes('administrado'))
+
+        const esEnfermera = rol === 'enfermera'
+
+        if (estadoAvanzado || esEnfermera) {
+          setReadonly(true)
+          setResultado(checkData)
+          setElapsed(0)
+          setLoading(false)
+          addToast('Vista de solo lectura — diagnostico ya procesado', 'info', 3000)
+          return
+        }
+
+        const start = performance.now()
+        const res = await fetch(`/api/diagnosticar/${id}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rol })
+        })
+        const data = await res.json()
         setElapsed(Math.round(performance.now() - start))
         setResultado(data)
-        setLoading(false)
-        addToast(`Motor IA completado en ${Math.round(performance.now() - start)}ms`, 'success', 4000)
-      })
-      .catch(() => setLoading(false))
+        setReadonly(false)
+        if (res.ok) {
+          addToast(`Motor IA completado en ${Math.round(performance.now() - start)}ms`, 'success', 4000)
+        }
+      } catch (e) {
+        addToast('Error al cargar diagnostico', 'critico')
+      }
+      setLoading(false)
+    }
+    load()
   }, [id, rol])
 
   const confirmarDiagnostico = async () => {
@@ -83,10 +113,15 @@ export default function DiagnosticoIA() {
 
   const diagPrincipal = resultado.diagnosticos?.[0]
   const estaConfirmado = resultado.estado === 'diagnostico_confirmado'
-  const puedeConfirmar = rol === 'medico' && !estaConfirmado
+  const puedeConfirmar = rol === 'medico' && !estaConfirmado && !readonly
 
   return (
     <div className="page-content">
+      {readonly && (
+        <div className="banner banner-info" style={{ marginBottom: 12 }}>
+          {'\u{1F512}'} Vista de solo lectura — los datos mostrados no modifican el estado del paciente.
+        </div>
+      )}
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-body">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13, color: 'var(--gray-600)', marginBottom: 12 }}>

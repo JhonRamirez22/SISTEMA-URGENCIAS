@@ -14,10 +14,10 @@ import Notificaciones from './views/Notificaciones'
 
 export const RolContext = createContext()
 
-function AppLayout({ notificacionesCount }) {
+function AppLayout({ notificacionesCount, onLogout }) {
   return (
     <>
-      <Sidebar notificacionesCount={notificacionesCount} />
+      <Sidebar notificacionesCount={notificacionesCount} onLogout={onLogout} />
       <Header notificacionesCount={notificacionesCount} />
       <div className="main-content">
         <Routes>
@@ -54,7 +54,7 @@ export default function App() {
     <RolContext.Provider value={{ rol, setRol }}>
       <ToastProvider>
         <div className="app">
-          <AppLayout notificacionesCount={notifCount} />
+          <AppLayout notificacionesCount={notifCount} onLogout={() => { setAuthenticated(false); setRol('medico'); }} />
         </div>
       </ToastProvider>
     </RolContext.Provider>

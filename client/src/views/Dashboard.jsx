@@ -44,6 +44,12 @@ export default function Dashboard() {
     return () => clearInterval(interval)
   }, [notifCount])
 
+  useEffect(() => {
+    fetch('/api/pacientes')
+      .then(r => r.json())
+      .then(setPacientes)
+  }, [rol])
+
   const filtered = useMemo(() => {
     let list = [...pacientes]
     if (busqueda) {
@@ -193,7 +199,7 @@ export default function Dashboard() {
               </thead>
               <tbody>
                 {filtered.map(p => (
-                  <tr key={p.id} className="clickable" onClick={() => !p.diagnostico && solicitarDiagnostico(p)}>
+                  <tr key={p.id} className="clickable" onClick={() => !p.diagnostico && rol !== 'enfermera' && solicitarDiagnostico(p)}>
                     <td><SemaforoBadge riesgo={p.riesgo} /></td>
                     <td>
                       <div className="cell-paciente">{p.nombre}</div>
@@ -211,6 +217,7 @@ export default function Dashboard() {
                       {p.estado === 'formulacion_pendiente' && <span className="badge badge-medium">Formula Pendiente</span>}
                       {p.estado === 'formulacion_aprobada' && <span className="badge badge-approved">Aprobada</span>}
                       {p.estado === 'formulacion_rechazada' && <span className="badge badge-rejected">Rechazada</span>}
+                      {p.estado === 'medicamento_administrado' && <span className="badge badge-low">Administrado</span>}
                     </td>
                     <td>
                       <span className={`badge badge-${p.riesgo === 'CRITICO' ? 'critical' : p.riesgo === 'ALTO' ? 'high' : p.riesgo === 'MEDIO' ? 'medium' : 'low'}`}>
@@ -218,10 +225,13 @@ export default function Dashboard() {
                       </span>
                     </td>
                     <td>
-                      {!p.diagnostico && (
+                      {!p.diagnostico && rol !== 'enfermera' && (
                         <button className="btn btn-primary btn-sm" onClick={(e) => { e.stopPropagation(); solicitarDiagnostico(p); }} disabled={loadingId === p.id}>
                           {loadingId === p.id ? '...' : 'Diagnosticar IA'}
                         </button>
+                      )}
+                      {!p.diagnostico && rol === 'enfermera' && (
+                        <span className="cell-sub">Pendiente de diagnostico medico</span>
                       )}
                       {p.diagnostico && (
                         <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); navigate(`/diagnostico/${p.id}`); }}>

@@ -2,12 +2,12 @@ import { useContext } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { RolContext } from '../App'
 
-export default function Sidebar({ notificacionesCount }) {
+export default function Sidebar({ notificacionesCount, onLogout }) {
   const { rol, setRol } = useContext(RolContext)
   const navigate = useNavigate()
 
   const handleLogout = () => {
-    navigate('/login')
+    if (onLogout) onLogout()
   }
 
   const dores = {
